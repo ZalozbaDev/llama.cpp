@@ -1,0 +1,9 @@
+version: '3'
+services:
+  llama_server:
+    image: llama_cpp_server:latest
+    restart: unless-stopped
+    volumes:
+     - ./model/:/model
+    ports:
+     - "8080:8080"
