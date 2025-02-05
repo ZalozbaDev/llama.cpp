@@ -21,6 +21,27 @@ case $MODEL in
 		python3 convert_hf_to_gguf.py /cache/Korla_serb-gpt/ --outfile /output/Korla/serb-gpt/serb-gpt.gguf
 		;;
 		
+	meta-llama/Llama-3.1-70B-Instruct)
+		if [ ! -e /cache/meta-llama_Llama-3.1-70B-Instruct ]; then
+			git clone https://huggingface.co/meta-llama/Llama-3.1-70B-Instruct
+		fi
+		
+		mkdir -p /output/meta-llama/Llama-3.1-70B-Instruct
+		cd $LLAMA_b4458
+		python3 convert_hf_to_gguf.py /cache/meta-llama_Llama-3.1-70B-Instruct/ --outfile /output/meta-llama/Llama-3.1-70B-Instruct/serb-gpt.gguf
+		;;
+		
+	meta-llama/Llama-3.1-8B)
+		if [ ! -e /cache/meta-llama_Llama-3.1-8B ]; then
+			git clone https://huggingface.co/meta-llama/Llama-3.1-8B
+		fi
+
+		mkdir -p /output/meta-llama/Llama-3.1-8B
+		cd $LLAMA_b4458
+		python3 convert_hf_to_gguf.py /cache/meta-llama_Llama-3.1-8B/ --outfile /output/meta-llama/Llama-3.1-8B/serb-gpt.gguf
+		;;
+		
+		
 	*)
 		echo "Model $MODEL unknown!"
 		;;

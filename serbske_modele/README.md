@@ -8,13 +8,20 @@ https://huggingface.co/Korla/serb-gpt
 
 replace MODEL variable with "USERNAME/MODELNAME" 
 
-supported models:
+## supported models
+
+### sorbian
 
 * Korla/serb-gpt
 
+### other
+
+* meta-llama/Llama-3.1-8B 
+
 non-working models:
 
-* n/a
+* meta-llama/Llama-3.1-70B-Instruct (not tested yet)
+
 
 ```code
 
