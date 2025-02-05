@@ -37,3 +37,9 @@ docker run -e MODEL="Korla/serb-gpt" --mount type=bind,source=$HOME/cache,target
 ```code
 ./build/bin/llama-server --model ../text_models/Korla/serb-gpt/serb-gpt.gguf --port 9000
 ```
+
+## Pre-converted models
+
+### other
+
+* TheBloke/mistral-ft-optimized-1227-GGUF

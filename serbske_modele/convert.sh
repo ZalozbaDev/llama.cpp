@@ -23,7 +23,7 @@ case $MODEL in
 		
 	meta-llama/Llama-3.1-70B-Instruct)
 		if [ ! -e /cache/meta-llama_Llama-3.1-70B-Instruct ]; then
-			git clone https://huggingface.co/meta-llama/Llama-3.1-70B-Instruct
+			git clone https://huggingface.co/meta-llama/Llama-3.1-70B-Instruct /cache/meta-llama_Llama-3.1-70B-Instruct
 		fi
 		
 		mkdir -p /output/meta-llama/Llama-3.1-70B-Instruct
@@ -33,13 +33,24 @@ case $MODEL in
 		
 	meta-llama/Llama-3.1-8B)
 		if [ ! -e /cache/meta-llama_Llama-3.1-8B ]; then
-			git clone https://huggingface.co/meta-llama/Llama-3.1-8B
+			git clone https://huggingface.co/meta-llama/Llama-3.1-8B /cache/meta-llama_Llama-3.1-8B
 		fi
 
 		mkdir -p /output/meta-llama/Llama-3.1-8B
 		cd $LLAMA_b4458
-		python3 convert_hf_to_gguf.py /cache/meta-llama_Llama-3.1-8B/ --outfile /output/meta-llama/Llama-3.1-8B/serb-gpt.gguf
+		python3 convert_hf_to_gguf.py /cache/meta-llama_Llama-3.1-8B/ --outfile /output/meta-llama/Llama-3.1-8B/meta-llama_Llama-3.1-8B.gguf
 		;;
+		
+	mistralai/Mistral-Small-24B-Base-2501)
+		if [ ! -e /cache/mistralai_Mistral-Small-24B-Base-2501 ]; then
+			git clone https://huggingface.co/mistralai/Mistral-Small-24B-Base-2501 /cache/mistralai_Mistral-Small-24B-Base-2501
+		fi
+
+		mkdir -p /output/mistralai/Mistral-Small-24B-Base-2501
+		cd $LLAMA_b4458
+		python3 convert_hf_to_gguf.py /cache/mistralai_Mistral-Small-24B-Base-2501/ --outfile /output/mistralai/Mistral-Small-24B-Base-2501/mistralai_Mistral-Small-24B-Base-2501.gguf
+		;;
+		
 		
 		
 	*)
