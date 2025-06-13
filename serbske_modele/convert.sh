@@ -12,9 +12,11 @@ case $MODEL in
 			GIT_LFS_SKIP_SMUDGE=1 git clone https://huggingface.co/unsloth/Meta-Llama-3.1-8B-Instruct      /cache/unsloth_Meta-Llama-3.1-8B-Instruct
 		fi
 		
-		cp /cache/unsloth_Meta-Llama-3.1-8B-Instruct/tokenizer.json          /cache/Korla_serb-gpt
-		cp /cache/unsloth_Meta-Llama-3.1-8B-Instruct/tokenizer_config.json   /cache/Korla_serb-gpt
-		cp /cache/unsloth_Meta-Llama-3.1-8B-Instruct/special_tokens_map.json /cache/Korla_serb-gpt
+		# No longer necessary, model repo now contains correct files 
+		
+		# cp /cache/unsloth_Meta-Llama-3.1-8B-Instruct/tokenizer.json          /cache/Korla_serb-gpt
+		# cp /cache/unsloth_Meta-Llama-3.1-8B-Instruct/tokenizer_config.json   /cache/Korla_serb-gpt
+		# cp /cache/unsloth_Meta-Llama-3.1-8B-Instruct/special_tokens_map.json /cache/Korla_serb-gpt
 		
 		mkdir -p /output/Korla/serb-gpt
 		cd $LLAMA_b4458
