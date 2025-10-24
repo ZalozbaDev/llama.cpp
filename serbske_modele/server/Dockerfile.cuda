@@ -1,12 +1,18 @@
 FROM ubuntu:noble
 
-# docker build -f Dockerfile.cuda -t llama_cpp_server .
+# docker build -f Dockerfile.cuda --build-arg NVIDIA_DRIVER_PACKAGE= --build-arg NVIDIA_DRIVER_VERSION= --progress=plain -t llama_cpp_server .
 
 RUN apt update && apt install -y git git-lfs
 
 RUN git clone https://github.com/ZalozbaDev/llama.cpp /llama.cpp_b4458 && cd llama.cpp_b4458 && git checkout b4458
 
-RUN apt install -y cmake g++ nvidia-cuda-toolkit nvidia-utils-535-server=535.216.03-0ubuntu0.24.04.1
+RUN apt install -y cmake g++ nvidia-cuda-toolkit
+
+# try to force a fixed version
+ARG NVIDIA_DRIVER_PACKAGE
+ARG NVIDIA_DRIVER_VERSION
+
+RUN apt install -y $NVIDIA_DRIVER_PACKAGE=$NVIDIA_DRIVER_VERSION
 
 RUN cd llama.cpp_b4458 && cmake -B build -DGGML_CUDA=ON && cmake --build build -j --config Release
 

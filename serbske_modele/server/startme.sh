@@ -1,5 +1,7 @@
 #!/bin/bash
 
+nvidia-smi
+
 echo "Using first model found:"
 ls -l /model/
 
