@@ -13,6 +13,7 @@ replace MODEL variable with "USERNAME/MODELNAME"
 ### sorbian
 
 * Korla/serb-gpt
+* tartuNLP/Qwen2.5-3B-Instruct-hsb-dsb
 
 ### other
 

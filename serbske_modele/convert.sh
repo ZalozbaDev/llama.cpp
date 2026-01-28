@@ -53,6 +53,16 @@ case $MODEL in
 		python3 convert_hf_to_gguf.py /cache/mistralai_Mistral-Small-24B-Base-2501/ --outfile /output/mistralai/Mistral-Small-24B-Base-2501/mistralai_Mistral-Small-24B-Base-2501.gguf
 		;;
 		
+	tartuNLP/Qwen2.5-3B-Instruct-hsb-dsb)
+		if [ ! -e /cache/tartuNLP_Qwen2.5-3B-Instruct-hsb-dsb ]; then
+			git clone https://huggingface.co/tartuNLP/Qwen2.5-3B-Instruct-hsb-dsb /cache/tartuNLP_Qwen2.5-3B-Instruct-hsb-dsb
+		fi
+
+		mkdir -p /output/tartuNLP/Qwen2.5-3B-Instruct-hsb-dsb
+		cd $LLAMA_b4458
+		python3 convert_hf_to_gguf.py /cache/tartuNLP_Qwen2.5-3B-Instruct-hsb-dsb --outfile /output/tartuNLP/Qwen2.5-3B-Instruct-hsb-dsb/tartuNLP_Qwen2.5-3B-Instruct-hsb-dsb.gguf
+		;;
+		
 		
 		
 	*)
