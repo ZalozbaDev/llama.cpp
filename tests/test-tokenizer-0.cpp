@@ -161,7 +161,7 @@ int main(int argc, char **argv) {
 
         auto cparams = llama_context_default_params();
 
-        ctx = llama_new_context_with_model(model, cparams);
+        ctx = llama_init_from_model(model, cparams);
 
         if (ctx == NULL) {
             fprintf(stderr, "%s: error: failed to load vocab '%s'\n", __func__, fname.c_str());
@@ -300,8 +300,8 @@ int main(int argc, char **argv) {
         fprintf(stderr, "%s : tokens written to '%s'\n", __func__, (fname_text + ".tokcpp").c_str());
     }
 
-    llama_model_free(model);
     llama_free(ctx);
+    llama_model_free(model);
 
     llama_backend_free();
 
