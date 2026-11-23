@@ -26,10 +26,10 @@ non-working models:
 
 ```code
 
-docker build --progress=plain -t convert_to_ggul .
+docker build --progress=plain -t convert_to_gguf .
 mkdir ~/cache
 mkdir ~/text_models/
-docker run -e MODEL="Korla/serb-gpt" --mount type=bind,source=$HOME/cache,target=/cache/ --mount type=bind,source=$HOME/text_models,target=/output/ -it convert_to_ggul /convert.sh 
+docker run -e MODEL="Korla/serb-gpt" --mount type=bind,source=$HOME/cache,target=/cache/ --mount type=bind,source=$HOME/text_models,target=/output/ -it convert_to_gguf /convert.sh 
 
 ```
 

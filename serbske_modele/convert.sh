@@ -1,6 +1,7 @@
 #!/bin/bash
 
 export LLAMA_b4458=llama.cpp_b4458
+export LLAMA_b12653=llama.cpp_b12653
 
 case $MODEL in
 	
@@ -61,6 +62,18 @@ case $MODEL in
 		mkdir -p /output/tartuNLP/Qwen2.5-3B-Instruct-hsb-dsb
 		cd $LLAMA_b4458
 		python3 convert_hf_to_gguf.py /cache/tartuNLP_Qwen2.5-3B-Instruct-hsb-dsb --outfile /output/tartuNLP/Qwen2.5-3B-Instruct-hsb-dsb/tartuNLP_Qwen2.5-3B-Instruct-hsb-dsb.gguf
+		;;
+		
+	TomMoeras/wmt26-lt3-sorbian)
+		if [ ! -e /cache/TomMoeras_wmt26-lt3-sorbian ]; then
+			git clone https://huggingface.co/TomMoeras/wmt26-lt3-sorbian /cache/TomMoeras_wmt26-lt3-sorbian
+		fi
+
+		mkdir -p /output/TomMoeras/wmt26-lt3-sorbian
+		# cd $LLAMA_b4458
+		cd $LLAMA_b12653;
+		python3 convert_hf_to_gguf.py /cache/TomMoeras_wmt26-lt3-sorbian/LT3-DevTransfer/ --outfile /output/TomMoeras/wmt26-lt3-sorbian/TomMoeras_wmt26-lt3-sorbian.gguf
+		./build/bin/llama-quantize /output/TomMoeras/wmt26-lt3-sorbian/TomMoeras_wmt26-lt3-sorbian.gguf /output/TomMoeras/wmt26-lt3-sorbian/TomMoeras_wmt26-lt3-sorbian-Q4_K_M.gguf Q4_K_M
 		;;
 		
 		
