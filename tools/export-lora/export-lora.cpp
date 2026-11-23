@@ -5,6 +5,7 @@
 #include "arg.h"
 #include "common.h"
 
+#include <clocale>
 #include <map>
 #include <vector>
 #include <string>
@@ -103,6 +104,9 @@ struct file_input {
         auto offset = gguf_get_data_offset(ctx_gguf) + gguf_get_tensor_offset(ctx_gguf, i_tensor_in);
         f_in.seekg(offset);
         f_in.read((char* )buf.data(), len);
+        if (!f_in) {
+            throw std::runtime_error("failed to read data for tensor " + name + ", input file may be truncated");
+        }
     }
 
     ~file_input() {
@@ -178,6 +182,8 @@ struct lora_merge_ctx {
     ggml_type get_out_tensor_type(struct ggml_tensor * t) {
         if (t->type == GGML_TYPE_F32) {
             return GGML_TYPE_F32;
+        } else if (t->type == GGML_TYPE_BF16) {
+            return GGML_TYPE_BF16;
         } else {
             return GGML_TYPE_F16;
         }
@@ -190,7 +196,7 @@ struct lora_merge_ctx {
         gguf_set_val_u32(ctx_out, "general.file_type", LLAMA_FTYPE_MOSTLY_F16);
 
         // check if all lora adapters have the same tensors
-        // TODO: remove this when we can support merging subset of adapters. Ref: https://github.com/ggerganov/llama.cpp/pull/8607#discussion_r1686027777
+        // TODO: remove this when we can support merging subset of adapters. Ref: https://github.com/ggml-org/llama.cpp/pull/8607#discussion_r1686027777
         static const char * err_no_subset_adapter = "Input adapters do not have the same list of tensors. This is not yet supported. Please merge the adapter one-by-one instead of merging all at once.";
         if (adapters.size() > 1) {
             for (size_t i = 1; i < adapters.size(); ++i) {
@@ -405,15 +411,18 @@ struct lora_merge_ctx {
 
 static void print_usage(int, char ** argv) {
     printf("\nexample usage:\n");
-    printf("\n  %s -m base-model.gguf --lora lora-file.gguf -o merged-model-f16.gguf\n", argv[0]);
-    printf("\nNOTE: output model is F16\n");
+    printf("\n  %s -m base-model.gguf --lora lora-file.gguf -o merged-model.gguf\n", argv[0]);
     printf("\n");
 }
 
 int main(int argc, char ** argv) {
+    std::setlocale(LC_NUMERIC, "C");
+
     common_params params;
 
     params.out_file = "ggml-lora-merged-f16.gguf";
+
+    common_init();
 
     if (!common_params_parse(argc, argv, params, LLAMA_EXAMPLE_EXPORT_LORA, print_usage)) {
         return 1;

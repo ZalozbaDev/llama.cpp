@@ -1,134 +1,78 @@
-#if defined(_MSC_VER)
-#define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING
-#endif
-
+#include "ggml-backend.h"
 #include "ggml-rpc.h"
 #ifdef _WIN32
 #  define NOMINMAX
-#  define DIRECTORY_SEPARATOR '\\'
-#  include <locale>
 #  include <windows.h>
 #  include <fcntl.h>
 #  include <io.h>
 #else
-#  define DIRECTORY_SEPARATOR '/'
 #  include <unistd.h>
-#  include <sys/stat.h>
 #endif
-#include <codecvt>
-#include <string>
-#include <stdio.h>
-#include <vector>
-#include <filesystem>
 #include <algorithm>
-#include <thread>
+#include <clocale>
+#include <filesystem>
 #include <regex>
+#include <stdio.h>
+#include <string>
+#include <thread>
+#include <vector>
 
-namespace fs = std::filesystem;
+#if !defined(_WIN32)
+#include <sys/types.h>
+#include <pwd.h>
+#endif
+
 
 // NOTE: this is copied from common.cpp to avoid linking with libcommon
-// returns true if successful, false otherwise
-static bool fs_create_directory_with_parents(const std::string & path) {
-#ifdef _WIN32
-    std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
-    std::wstring wpath = converter.from_bytes(path);
-
-    // if the path already exists, check whether it's a directory
-    const DWORD attributes = GetFileAttributesW(wpath.c_str());
-    if ((attributes != INVALID_FILE_ATTRIBUTES) && (attributes & FILE_ATTRIBUTE_DIRECTORY)) {
-        return true;
-    }
-
-    size_t pos_slash = 0;
-
-    // process path from front to back, procedurally creating directories
-    while ((pos_slash = path.find('\\', pos_slash)) != std::string::npos) {
-        const std::wstring subpath = wpath.substr(0, pos_slash);
-        const wchar_t * test = subpath.c_str();
-
-        const bool success = CreateDirectoryW(test, NULL);
-        if (!success) {
-            const DWORD error = GetLastError();
-
-            // if the path already exists, ensure that it's a directory
-            if (error == ERROR_ALREADY_EXISTS) {
-                const DWORD attributes = GetFileAttributesW(subpath.c_str());
-                if (attributes == INVALID_FILE_ATTRIBUTES || !(attributes & FILE_ATTRIBUTE_DIRECTORY)) {
-                    return false;
-                }
-            } else {
-                return false;
-            }
-        }
-
-        pos_slash += 1;
-    }
-
-    return true;
-#else
-    // if the path already exists, check whether it's a directory
-    struct stat info;
-    if (stat(path.c_str(), &info) == 0) {
-        return S_ISDIR(info.st_mode);
-    }
-
-    size_t pos_slash = 1; // skip leading slashes for directory creation
-
-    // process path from front to back, procedurally creating directories
-    while ((pos_slash = path.find('/', pos_slash)) != std::string::npos) {
-        const std::string subpath = path.substr(0, pos_slash);
-        struct stat info;
-
-        // if the path already exists, ensure that it's a directory
-        if (stat(subpath.c_str(), &info) == 0) {
-            if (!S_ISDIR(info.st_mode)) {
-                return false;
-            }
-        } else {
-            // create parent directories
-            const int ret = mkdir(subpath.c_str(), 0755);
-            if (ret != 0) {
-                return false;
-            }
-        }
-
-        pos_slash += 1;
-    }
-
-    return true;
-#endif // _WIN32
+static std::string common_get_env(const std::string & name) {
+    const char * value = std::getenv(name.c_str());
+    return value == nullptr ? "" : value;
 }
 
 // NOTE: this is copied from common.cpp to avoid linking with libcommon
-static std::string fs_get_cache_directory() {
-    std::string cache_directory = "";
-    auto ensure_trailing_slash = [](std::string p) {
-        // Make sure to add trailing slash
-        if (p.back() != DIRECTORY_SEPARATOR) {
-            p += DIRECTORY_SEPARATOR;
-        }
-        return p;
-    };
-    if (getenv("LLAMA_CACHE")) {
-        cache_directory = std::getenv("LLAMA_CACHE");
-    } else {
-#if defined(__linux__) || defined(__FreeBSD__) || defined(_AIX) || defined(__OpenBSD__)
-        if (std::getenv("XDG_CACHE_HOME")) {
-            cache_directory = std::getenv("XDG_CACHE_HOME");
-        } else {
-            cache_directory = std::getenv("HOME") + std::string("/.cache/");
-        }
-#elif defined(__APPLE__)
-        cache_directory = std::getenv("HOME") + std::string("/Library/Caches/");
-#elif defined(_WIN32)
-        cache_directory = std::getenv("LOCALAPPDATA");
-#else
-#  error Unknown architecture
-#endif
-        cache_directory = ensure_trailing_slash(cache_directory);
-        cache_directory += "llama.cpp";
+#if !defined(_WIN32)
+static std::filesystem::path get_home_directory() {
+    std::filesystem::path home = common_get_env("HOME");
+    if (!home.empty()) {
+        return home;
     }
-    return ensure_trailing_slash(cache_directory);
+    const struct passwd * pw = getpwuid(getuid());
+    if (!pw || !pw->pw_dir || !*pw->pw_dir) {
+        throw std::runtime_error("Failed to find $HOME directory");
+    }
+    return pw->pw_dir;
+}
+#endif
+
+// NOTE: this is copied from common.cpp to avoid linking with libcommon
+static std::filesystem::path fs_get_cache_directory() {
+    std::filesystem::path cache_directory = common_get_env("LLAMA_CACHE");
+    if (!cache_directory.empty()) {
+        return cache_directory;
+    }
+#if defined(_WIN32)
+    cache_directory = common_get_env("LOCALAPPDATA");
+    if (cache_directory.empty()) {
+        throw std::runtime_error("Failed to find %LOCALAPPDATA% directory");
+    }
+#elif defined(__APPLE__)
+    cache_directory = get_home_directory() / "Library/Caches";
+#else
+    cache_directory = common_get_env("XDG_CACHE_HOME");
+    if (cache_directory.empty()) {
+        cache_directory = get_home_directory() / ".cache";
+    }
+#endif
+    return cache_directory / "llama.cpp";
+}
+
+// NOTE: this is copied from common.h to avoid linking with libcommon
+static bool common_create_directories(const std::filesystem::path & path, std::error_code & ec) {
+#if defined(__linux__)
+    return std::filesystem::create_directories(path / "", ec);
+#else
+    return std::filesystem::create_directories(path, ec);
+#endif
 }
 
 struct rpc_server_params {
@@ -232,7 +176,8 @@ static std::vector<ggml_backend_dev_t> get_devices(const rpc_server_params & par
     if (devices.empty()) {
         for (size_t i = 0; i < ggml_backend_dev_count(); i++) {
             ggml_backend_dev_t dev = ggml_backend_dev_get(i);
-            if (ggml_backend_dev_type(dev) != GGML_BACKEND_DEVICE_TYPE_CPU) {
+            enum ggml_backend_dev_type dev_type = ggml_backend_dev_type(dev);
+            if (dev_type != GGML_BACKEND_DEVICE_TYPE_CPU && dev_type != GGML_BACKEND_DEVICE_TYPE_ACCEL) {
                 devices.push_back(dev);
             }
         }
@@ -250,6 +195,8 @@ static std::vector<ggml_backend_dev_t> get_devices(const rpc_server_params & par
 }
 
 int main(int argc, char * argv[]) {
+    std::setlocale(LC_NUMERIC, "C");
+
     ggml_backend_load_all();
 
     rpc_server_params params;
@@ -277,11 +224,14 @@ int main(int argc, char * argv[]) {
     const char * cache_dir = nullptr;
     std::string cache_dir_str;
     if (params.use_cache) {
-        cache_dir_str = fs_get_cache_directory() + "rpc/";
-        if (!fs_create_directory_with_parents(cache_dir_str)) {
-            fprintf(stderr, "Failed to create cache directory: %s\n", cache_dir_str.c_str());
+        const std::filesystem::path cache_dir_path = fs_get_cache_directory() / "rpc";
+        std::error_code ec;
+        common_create_directories(cache_dir_path, ec);
+        if (ec) {
+            fprintf(stderr, "Failed to create cache directory: %s\n", cache_dir_path.string().c_str());
             return 1;
         }
+        cache_dir_str = cache_dir_path.string();
         cache_dir = cache_dir_str.c_str();
     }
 

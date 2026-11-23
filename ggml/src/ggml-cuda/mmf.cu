@@ -2,6 +2,13 @@
 #include "mmf.cuh"
 #include "mmid.cuh"
 
+static __forceinline__ int mmf_get_rows_per_block(const int cc) {
+    if (GGML_CUDA_CC_IS_CDNA(cc)) {
+        return MMF_ROWS_PER_BLOCK_CDNA;
+    } else {
+        return MMF_ROWS_PER_BLOCK;
+    }
+}
 
 void ggml_cuda_mul_mat_f(ggml_backend_cuda_context & ctx, const ggml_tensor * src0, const ggml_tensor * src1, const ggml_tensor * ids, ggml_tensor * dst) {
     GGML_ASSERT(        src1->type == GGML_TYPE_F32);
@@ -36,14 +43,14 @@ void ggml_cuda_mul_mat_f(ggml_backend_cuda_context & ctx, const ggml_tensor * sr
     const int64_t s13 = src1->nb[3] / ts_src1;
     const int64_t s3  =  dst->nb[3] / ts_dst;
 
-    const int64_t ids_s0 = ids ? ids->nb[0] / ggml_type_size(ids->type) : 0;
     const int64_t ids_s1 = ids ? ids->nb[1] / ggml_type_size(ids->type) : 0;
 
     mmf_ids_data ids_info{};
     mmf_ids_data * ids_info_ptr = nullptr;
     ggml_cuda_pool_alloc<int32_t> ids_src_compact_dev;
     ggml_cuda_pool_alloc<int32_t> ids_dst_compact_dev;
-    ggml_cuda_pool_alloc<int32_t> expert_bounds_dev;
+
+    ggml_cuda_pool_alloc<ggml_cuda_mm_id_tile_spec> tile_spec_dev;
 
     // For MUL_MAT_ID the memory layout is different than for MUL_MAT:
     const int64_t ncols_dst          = ids ? ne2  : ne1;
@@ -62,56 +69,63 @@ void ggml_cuda_mul_mat_f(ggml_backend_cuda_context & ctx, const ggml_tensor * sr
         nchannels_y      = ids->ne[0];
     }
 
-    if (ids && ncols_dst > 16) {
+    if (ids) {
         const int64_t n_expert_used = ids->ne[0];
         const int64_t n_experts     = ne02;
         const int64_t n_tokens      = ne12;
         const int64_t ne_get_rows   = n_tokens * n_expert_used;
+        const int64_t max_tiles     = (ne_get_rows + 16 - 1) / 16 + ne02;
 
         ids_src_compact_dev.alloc(ctx.pool(), ne_get_rows);
         ids_dst_compact_dev.alloc(ctx.pool(), ne_get_rows);
-        expert_bounds_dev.alloc(ctx.pool(), n_experts + 1);
+        tile_spec_dev.alloc(ctx.pool(), max_tiles);
 
         const int si1  = static_cast<int>(ids_s1);
         const int sis1 = static_cast<int>(src1->nb[2] / src1->nb[1]);
 
         GGML_ASSERT(sis1 > 0);
 
-        ggml_cuda_launch_mm_ids_helper(ids_d, ids_src_compact_dev.get(), ids_dst_compact_dev.get(), expert_bounds_dev.get(),
-            static_cast<int>(n_experts), static_cast<int>(n_tokens), static_cast<int>(n_expert_used), static_cast<int>(ne11), si1, sis1, ctx.stream());
+        ggml_cuda_launch_mm_ids_helper(ids_d, ids_src_compact_dev.get(), ids_dst_compact_dev.get(), tile_spec_dev.get(),
+            static_cast<int>(n_experts), static_cast<int>(n_tokens), static_cast<int>(n_expert_used), static_cast<int>(ne11), 16,
+            si1, sis1, /*write_inverse =*/ false, ctx.stream());
         CUDA_CHECK(cudaGetLastError());
 
-        ids_info.ids_src_compact   = ids_src_compact_dev.get();
-        ids_info.ids_dst_compact   = ids_dst_compact_dev.get();
-        ids_info.expert_bounds_dev = expert_bounds_dev.get();
-        ids_info.n_experts         = static_cast<int>(n_experts);
-        ids_info.sis1              = sis1;
+        ids_info.ids_src_compact = ids_src_compact_dev.get();
+        ids_info.ids_dst_compact = ids_dst_compact_dev.get();
+        ids_info.tile_spec_dev   = tile_spec_dev.get();
+        ids_info.n_experts       = static_cast<int>(n_experts);
+        ids_info.max_tiles       = static_cast<int>(max_tiles);
+        ids_info.sis1            = sis1;
         ids_info_ptr = &ids_info;
     }
+
+    const int device    = ggml_cuda_get_device();
+    const int cc        = ggml_cuda_info().devices[device].cc;
+    const int rows_per_block = mmf_get_rows_per_block(cc);
 
     switch (src0->type) {
         case GGML_TYPE_F32: {
             const float * src0_d = (const float *) src0->data;
             constexpr int vals_per_T = 1;
-            mul_mat_f_switch_cols_per_block(
-                src0_d, src1_d, ids_d, dst_d, ne00/vals_per_T, ne01, ncols_dst, s01/vals_per_T, stride_col_y/vals_per_T, stride_col_dst,
-                ids_s0, ids_s1, ne02, nchannels_y, nchannels_dst, s02/vals_per_T, stride_channel_y, stride_channel_dst,
+            mul_mat_f_switch_rows_per_block<float>(
+                rows_per_block, src0_d, src1_d, ids_d, dst_d, ne00/vals_per_T, ne01, ncols_dst, s01/vals_per_T, stride_col_y/vals_per_T, stride_col_dst,
+                ne02, nchannels_y, nchannels_dst, s02/vals_per_T, stride_channel_y, stride_channel_dst,
                 ne03, ne3, s03/vals_per_T, s13, s3, ctx.stream(), ids_info_ptr);
         } break;
         case GGML_TYPE_F16: {
             const half2 * src0_d = (const half2 *) src0->data;
             constexpr int vals_per_T = 2;
-            mul_mat_f_switch_cols_per_block(
-                src0_d, src1_d, ids_d, dst_d, ne00/vals_per_T, ne01, ncols_dst, s01/vals_per_T, stride_col_y/vals_per_T, stride_col_dst,
-                ids_s0, ids_s1, ne02, nchannels_y, nchannels_dst, s02/vals_per_T, stride_channel_y, stride_channel_dst,
+            mul_mat_f_switch_rows_per_block<half2>(
+                rows_per_block, src0_d, src1_d, ids_d, dst_d, ne00/vals_per_T, ne01, ncols_dst, s01/vals_per_T, stride_col_y/vals_per_T, stride_col_dst,
+                ne02, nchannels_y, nchannels_dst, s02/vals_per_T, stride_channel_y, stride_channel_dst,
                 ne03, ne3, s03/vals_per_T, s13, s3, ctx.stream(), ids_info_ptr);
         } break;
         case GGML_TYPE_BF16: {
             const nv_bfloat162 * src0_d = (const nv_bfloat162 *) src0->data;
             constexpr int vals_per_T = 2;
-            mul_mat_f_switch_cols_per_block(
-                src0_d, src1_d, ids_d, dst_d, ne00/vals_per_T, ne01, ncols_dst, s01/vals_per_T, stride_col_y/vals_per_T, stride_col_dst,
-                ids_s0, ids_s1, ne02, nchannels_y, nchannels_dst, s02/vals_per_T, stride_channel_y, stride_channel_dst,
+            mul_mat_f_switch_rows_per_block<nv_bfloat162>(
+                rows_per_block, src0_d, src1_d, ids_d, dst_d, ne00/vals_per_T, ne01, ncols_dst, s01/vals_per_T, stride_col_y/vals_per_T, stride_col_dst,
+                ne02, nchannels_y, nchannels_dst, s02/vals_per_T, stride_channel_y, stride_channel_dst,
                 ne03, ne3, s03/vals_per_T, s13, s3, ctx.stream(), ids_info_ptr);
         } break;
         default:
@@ -140,7 +154,11 @@ bool ggml_cuda_should_use_mmf(enum ggml_type type, int cc, int warp_size, const 
             return false;
         }
     }
-    if (src0_ne[1] % MMF_ROWS_PER_BLOCK != 0) {
+    if (src0_ne[1] % mmf_get_rows_per_block(cc) != 0) {
+        return false;
+    }
+
+    if (GGML_CUDA_CC_IS_CDNA3(cc) && type == GGML_TYPE_BF16) {
         return false;
     }
 
@@ -153,6 +171,11 @@ bool ggml_cuda_should_use_mmf(enum ggml_type type, int cc, int warp_size, const 
     } else {
         if (GGML_CUDA_CC_IS_RDNA3_0(cc) && src1_ncols > 8) {
             return false;
+        } else if (GGML_CUDA_CC_IS_CDNA2(cc) && (type == GGML_TYPE_F16 || type == GGML_TYPE_BF16)) {
+            //TODO: truse CDNA2 as CDNA1, tune the perf when CDNA2 is available.
+            return false;
+        } else if (GGML_CUDA_CC_IS_CDNA1(cc) && (type == GGML_TYPE_F16 || type == GGML_TYPE_BF16)) {
+            return false;
         } else if (src1_ncols > 16) {
             return false;
         }
@@ -160,11 +183,11 @@ bool ggml_cuda_should_use_mmf(enum ggml_type type, int cc, int warp_size, const 
 
     switch (type) {
         case GGML_TYPE_F32:
-            return ampere_mma_available(cc);
+            return ampere_mma_available(cc) || amd_mfma_available(cc);
         case GGML_TYPE_F16:
-            return volta_mma_available(cc) || turing_mma_available(cc) || amd_wmma_available(cc);
+            return volta_mma_available(cc) || turing_mma_available(cc) || amd_wmma_available(cc) || amd_mfma_available(cc);
         case GGML_TYPE_BF16:
-            return ampere_mma_available(cc) || amd_wmma_available(cc);
+            return ampere_mma_available(cc) || amd_wmma_available(cc) || amd_mfma_available(cc);
         default:
             return false;
     }
