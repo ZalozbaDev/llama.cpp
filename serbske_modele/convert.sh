@@ -72,11 +72,21 @@ case $MODEL in
 		mkdir -p /output/TomMoeras/wmt26-lt3-sorbian
 		# cd $LLAMA_b4458
 		cd $LLAMA_b12653;
-		python3 convert_hf_to_gguf.py /cache/TomMoeras_wmt26-lt3-sorbian/LT3-DevTransfer/ --outfile /output/TomMoeras/wmt26-lt3-sorbian/TomMoeras_wmt26-lt3-sorbian.gguf
+		python3 convert_hf_to_gguf.py /cache/TomMoeras_wmt26-lt3-sorbian/LT3-DevTransfer/ --outfile /output/TomMoeras/wmt26-lt3-sorbian/TomMoeras_wmt26-lt3-sorbian.gguf --outtype bf16
 		./build/bin/llama-quantize /output/TomMoeras/wmt26-lt3-sorbian/TomMoeras_wmt26-lt3-sorbian.gguf /output/TomMoeras/wmt26-lt3-sorbian/TomMoeras_wmt26-lt3-sorbian-Q4_K_M.gguf Q4_K_M
 		;;
 		
-		
+	yhn112/WMT_Limited_Resources_Sorbian)
+		if [ ! -e /cache/yhn112_WMT_Limited_Resources_Sorbian ]; then
+			git clone https://huggingface.co/yhn112/WMT_Limited_Resources_Sorbian /cache/yhn112_WMT_Limited_Resources_Sorbian
+		fi
+
+		mkdir -p /output/yhn112/WMT_Limited_Resources_Sorbian
+		# cd $LLAMA_b4458
+		cd $LLAMA_b12653;
+		python3 convert_hf_to_gguf.py /cache/yhn112_WMT_Limited_Resources_Sorbian/ --outfile /output/yhn112/WMT_Limited_Resources_Sorbian/WMT_Limited_Resources_Sorbian.gguf --outtype bf16
+		./build/bin/llama-quantize /output/yhn112/WMT_Limited_Resources_Sorbian/WMT_Limited_Resources_Sorbian.gguf /output/yhn112/WMT_Limited_Resources_Sorbian/WMT_Limited_Resources_Sorbian-Q4_K_M.gguf Q4_K_M
+		;;
 		
 	*)
 		echo "Model $MODEL unknown!"

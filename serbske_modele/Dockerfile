@@ -15,6 +15,8 @@ RUN cd /llama.cpp_b12653 && cmake -B build && cmake --build build -j4 --config R
 
 RUN pip install -r /llama.cpp_b12653/requirements/requirements-convert_hf_to_gguf.txt
 
+RUN pip install transformers==5.10.4
+
 COPY convert.sh /
 
 RUN chmod 755 convert.sh
