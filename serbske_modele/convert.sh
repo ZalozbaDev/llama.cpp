@@ -88,6 +88,18 @@ case $MODEL in
 		./build/bin/llama-quantize /output/yhn112/WMT_Limited_Resources_Sorbian/WMT_Limited_Resources_Sorbian.gguf /output/yhn112/WMT_Limited_Resources_Sorbian/WMT_Limited_Resources_Sorbian-Q4_K_M.gguf Q4_K_M
 		;;
 		
+	WITAJ-Sprachzentrum/Qwen2.5-1.5B_witaj_t2k_hs_hsb-dsb-de_2026-07-30)
+		if [ ! -e /cache/WITAJ-Sprachzentrum_Qwen2.5-1.5B_witaj_t2k_hs_hsb-dsb-de_2026-07-30 ]; then
+			git clone https://huggingface.co/WITAJ-Sprachzentrum/Qwen2.5-1.5B_witaj_t2k_hs_hsb-dsb-de_2026-07-30 /cache/WITAJ-Sprachzentrum_Qwen2.5-1.5B_witaj_t2k_hs_hsb-dsb-de_2026-07-30
+		fi
+
+		mkdir -p /output/WITAJ-Sprachzentrum/Qwen2.5-1.5B_witaj_t2k_hs_hsb-dsb-de_2026-07-30
+		# cd $LLAMA_b4458
+		cd $LLAMA_b12653;
+		python3 convert_hf_to_gguf.py /cache/WITAJ-Sprachzentrum_Qwen2.5-1.5B_witaj_t2k_hs_hsb-dsb-de_2026-07-30/ --outfile /output/WITAJ-Sprachzentrum/Qwen2.5-1.5B_witaj_t2k_hs_hsb-dsb-de_2026-07-30/Qwen2.5-1.5B_witaj_t2k_hs_hsb-dsb-de_2026-07-30.gguf --outtype bf16
+		./build/bin/llama-quantize /output/WITAJ-Sprachzentrum/Qwen2.5-1.5B_witaj_t2k_hs_hsb-dsb-de_2026-07-30/Qwen2.5-1.5B_witaj_t2k_hs_hsb-dsb-de_2026-07-30.gguf /output/WITAJ-Sprachzentrum/Qwen2.5-1.5B_witaj_t2k_hs_hsb-dsb-de_2026-07-30/Qwen2.5-1.5B_witaj_t2k_hs_hsb-dsb-de_2026-07-30-Q4_K_M.gguf Q4_K_M
+		;;
+		
 	*)
 		echo "Model $MODEL unknown!"
 		;;
